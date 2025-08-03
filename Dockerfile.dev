@@ -1,0 +1,33 @@
+# Development Dockerfile with hot reload
+FROM node:18-alpine as frontend-dev
+
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm install
+COPY frontend/ ./
+
+EXPOSE 3000
+CMD ["npm", "start"]
+
+FROM python:3.11-slim as backend-dev
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc g++ curl git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements-dev.txt .
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
+# Install development tools
+RUN pip install watchdog[watchmedo] pytest black flake8 mypy
+
+# Create app user
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+# Development command with hot reload
+CMD ["watchmedo", "auto-restart", "--directory=.", "--pattern=*.py", "--recursive", "--", "python", "app.py"]

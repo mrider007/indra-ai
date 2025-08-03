@@ -1,0 +1,30 @@
+# Model Configuration
+model_name: "microsoft/DialoGPT-medium"
+max_length: 512
+
+# Training Parameters
+batch_size: 4
+gradient_accumulation_steps: 4
+learning_rate: 5e-5
+num_epochs: 3
+warmup_steps: 100
+save_steps: 500
+eval_steps: 500
+logging_steps: 100
+
+# LoRA Configuration
+use_lora: true
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.1
+
+# Data Quality
+min_quality_score: 0.6
+
+# Evaluation
+test_prompts:
+  - "What is artificial intelligence?"
+  - "Explain machine learning in simple terms."
+  - "How does deep learning work?"
+  - "What are the benefits of automation?"
+  - "Describe the future of technology."

@@ -1,0 +1,40 @@
+sources:
+  - name: "tech_news"
+    base_url: "https://techcrunch.com"
+    selectors:
+      title: "h1.article__title"
+      content: ".article-content p"
+    max_pages: 50
+    delay: 2.0
+    use_selenium: false
+    enabled: true
+    
+  - name: "ai_research"
+    base_url: "https://arxiv.org/list/cs.AI/recent"
+    selectors:
+      title: ".list-title"
+      content: ".list-abstract"
+    max_pages: 30
+    delay: 3.0
+    use_selenium: true
+    enabled: true
+    
+  - name: "programming_blogs"
+    base_url: "https://dev.to"
+    selectors:
+      title: "h1"
+      content: ".crayons-article__body p"
+    max_pages: 40
+    delay: 1.5
+    use_selenium: false
+    enabled: true
+    
+  - name: "documentation"
+    base_url: "https://docs.python.org"
+    selectors:
+      title: "h1"
+      content: ".body p, .body pre"
+    max_pages: 100
+    delay: 1.0
+    use_selenium: false
+    enabled: false  # Disabled by default
