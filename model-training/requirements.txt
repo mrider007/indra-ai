@@ -1,6 +1,6 @@
 torch==2.1.0
 transformers==4.35.2
-datasets==2.14.6
+datasets>=2.15.0,<3.0
 accelerate==0.24.1
 peft==0.6.2
 bitsandbytes==0.41.3
