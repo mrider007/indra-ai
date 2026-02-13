@@ -59,7 +59,19 @@ async def health_check():
         "environment": "vercel"
     }
 
+@app.post("/chat", response_model=ChatResponse)
 @app.post("/chat/free", response_model=ChatResponse)
+async def chat_free(request: ChatRequest):
+    """Free tier chat endpoint for Vercel deployment"""
+
+@app.get("/model/info")
+async def get_model_info():
+    """Dummy model info for Vercel"""
+    return {
+        "model_name": "IndraAI Lite (Vercel)",
+        "status": "ready",
+        "version": "1.0.0"
+    }
 async def chat_free(request: ChatRequest):
     """Free tier chat endpoint for Vercel deployment"""
     

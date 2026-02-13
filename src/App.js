@@ -9,8 +9,9 @@ import ChatInterface from "./components/ChatInterface"
 import InputArea from "./components/InputArea"
 import TrainingModal from "./components/TrainingModal"
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000"
-const WS_URL = process.env.REACT_APP_WS_URL || "ws://localhost:8000"
+const isProduction = process.env.NODE_ENV === 'production'
+const API_URL = process.env.REACT_APP_API_URL || (isProduction ? "/api" : "http://localhost:8000")
+const WS_URL = process.env.REACT_APP_WS_URL || (isProduction ? "wss://" + window.location.host : "ws://localhost:8000")
 
 function App() {
   const [messages, setMessages] = useState([])
