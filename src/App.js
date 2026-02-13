@@ -58,7 +58,7 @@ function App() {
     } else if (!settings.useWebSocket && isConnected) {
       socketRef.current?.disconnect()
     }
-  }, [settings.useWebSocket, sessionId])
+  }, [settings.useWebSocket, sessionId, isConnected])
 
   const loadModelInfo = async () => {
     try {
