@@ -306,8 +306,20 @@ class ModelTrainer:
             logger.info(f"Training completed. Model saved to: {final_model_path}")
             TRAINING_JOBS.labels(status='completed').inc()
             
-            # Queue model serving update
-            self.queue.enqueue('model_serving.app.update_model', final_model_path)
+            # Trigger model update via API
+            try:
+                import requests
+                api_host = os.getenv('API_HOST', 'api')
+                api_port = os.getenv('API_PORT', '8000')
+                api_url = f"http://{api_host}:{api_port}/model/update"
+                
+                response = requests.post(api_url, params={'model_path': final_model_path})
+                if response.status_code == 200:
+                    logger.info(f"Successfully triggered model update on API: {api_url}")
+                else:
+                    logger.error(f"Failed to trigger model update. Status: {response.status_code}, Response: {response.text}")
+            except Exception as e:
+                logger.error(f"Error triggering model update via API: {e}")
             
             return final_model_path
             

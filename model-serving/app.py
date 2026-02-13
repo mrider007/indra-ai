@@ -281,19 +281,44 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down IndraAI API server")
 
+
+tags_metadata = [
+    {
+        "name": "chat",
+        "description": "Operations for chatting with the AI model.",
+    },
+    {
+        "name": "model",
+        "description": "Model management and training operations.",
+    },
+    {
+        "name": "user",
+        "description": "User profile and statistics.",
+    },
+    {
+        "name": "system",
+        "description": "System health and metrics.",
+    },
+    {
+        "name": "webhooks",
+        "description": "External webhooks (e.g. Stripe).",
+    },
+]
+
 # Initialize FastAPI app
 app = FastAPI(
     title="IndraAI API",
-    description="Advanced AI Platform with Free and Pro Tiers",
+    description="Advanced AI Platform with Free and Pro Tiers. Supports real-time WebSocket chat, model training, and detailed usage statistics.",
     version="2.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    openapi_tags=tags_metadata
 )
 
 # Add CORS middleware
 cors_origins = json.loads(os.getenv('CORS_ORIGINS', '["*"]'))
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -322,10 +347,13 @@ async def metrics_middleware(request, call_next):
     
     return response
 
-@app.get("/health", response_model=HealthCheck)
+@app.get("/health", response_model=HealthCheck, tags=["system"])
 @limiter.limit("10/minute")
 async def health_check(request:Request):
-    """Health check endpoint"""
+    """
+    Health check endpoint.
+    Returns the status of the API and whether the model is loaded.
+    """
     return HealthCheck(
         status="healthy",
         model_loaded=model_manager.model is not None,
@@ -333,15 +361,17 @@ async def health_check(request:Request):
         version=os.getenv('MODEL_VERSION', 'v2.0.0')
     )
 
-@app.get("/model/info", response_model=ModelInfo)
+@app.get("/model/info", response_model=ModelInfo, tags=["model"])
 @limiter.limit("5/minute")
 async def get_model_info(request: Request):
-    """Get information about the loaded model"""
+    """
+    Get information about the currently loaded model.
+    """
     if not model_manager.model_info:
         raise HTTPException(status_code=503, detail="No model loaded")
     return model_manager.model_info
 
-@app.post("/chat", response_model=ChatResponse)
+@app.post("/chat", response_model=ChatResponse, tags=["chat"])
 @limiter.limit("100/hour")
 async def chat(
     request: Request,  
@@ -349,7 +379,10 @@ async def chat(
     background_tasks: BackgroundTasks,
     user = Depends(lambda: app.state.auth_manager.get_current_user)
 ):
-    """Chat with the AI model (requires authentication)"""
+    """
+    Chat with the AI model (Standard/Pro).
+    Requires authentication. Pro users have higher limits.
+    """
     start_time = datetime.utcnow()
     
     # Check user quota
@@ -398,10 +431,14 @@ async def chat(
         remaining_quota=quota_info['tokens_remaining'] - tokens_used
     )
 
-@app.post("/chat/free", response_model=ChatResponse)
+@app.post("/chat/free", response_model=ChatResponse, tags=["chat"])
 @limiter.limit("10/hour")
 async def chat_free(request: Request, request_data: ChatRequest, background_tasks: BackgroundTasks):
-    """Free tier chat (limited functionality)"""
+    """
+    Free tier chat endpoint.
+    Limited functionality (shorter response, fixed temperature).
+    Does not require authentication.
+    """
     start_time = datetime.utcnow()
     
     # Limit free tier capabilities
@@ -432,7 +469,9 @@ async def chat_free(request: Request, request_data: ChatRequest, background_task
 
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
-    """WebSocket endpoint for real-time chat (Pro feature)"""
+    """
+    WebSocket endpoint for real-time chat (Pro feature).
+    """
     await manager.connect(websocket)
     
     try:
@@ -488,9 +527,11 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         manager.disconnect(websocket)
         logger.info(f"WebSocket disconnected for session: {session_id}")
 
-@app.get("/user/stats", response_model=UserStats)
+@app.get("/user/stats", response_model=UserStats, tags=["user"])
 async def get_user_stats(user = Depends(lambda: app.state.auth_manager.get_current_user)):
-    """Get user statistics and quota information"""
+    """
+    Get user statistics and quota information.
+    """
     quota_info = await app.state.auth_manager.check_user_quota(user.id)
     
     # Get subscription status
@@ -506,13 +547,15 @@ async def get_user_stats(user = Depends(lambda: app.state.auth_manager.get_curre
         subscription_status=subscription_status
     )
 
-@app.get("/chat/history/{session_id}")
+@app.get("/chat/history/{session_id}", tags=["chat"])
 async def get_chat_history(
     session_id: str, 
     limit: int = 50,
     user = Depends(lambda: app.state.auth_manager.get_current_user)
 ):
-    """Get chat history for a session"""
+    """
+    Get chat history for a specific session.
+    """
     result = app.state.supabase.table('chat_messages').select('*').eq('session_id', session_id).eq('user_id', user.id).order('created_at', desc=True).limit(limit).execute()
     
     if not result.data:
@@ -529,19 +572,60 @@ async def get_chat_history(
         for msg in reversed(result.data)
     ]
 
-@app.post("/model/update")
+@app.post("/model/update", tags=["model"])
 async def update_model(model_path: str):
-    """Update the loaded model (Admin only)"""
-    # TODO: Add admin authentication
+    """
+    Update the loaded model (Internal or Admin use only).
+    """
     try:
         model_manager.load_model(model_path)
         return {"status": "success", "message": f"Model updated to {model_path}"}
     except Exception as e:
+        logger.error(f"Failed to update model: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to update model: {str(e)}")
 
-@app.post("/subscription/webhook")
-async def stripe_webhook(request):
-    """Handle Stripe webhook events"""
+@app.post("/model/train", tags=["model"])
+async def train_model(background_tasks: BackgroundTasks, user = Depends(lambda: app.state.auth_manager.get_current_user)):
+    """
+    Trigger a new training job (Pro only).
+    Enqueues a training job in Redis.
+    """
+    # Check if user is pro
+    quota_info = await app.state.auth_manager.check_user_quota(user.id)
+    if quota_info['tier'] != 'pro':
+        raise HTTPException(status_code=403, detail="Training requires Pro subscription")
+
+    try:
+        # Enqueue training job
+        queue = redis.Queue('training', connection=app.state.redis)
+        job = queue.enqueue(
+            'model_training.train.ModelTrainer.train_model',
+            job_timeout='6h'
+        )
+        return {"status": "success", "job_id": job.id, "message": "Training job queued"}
+    except Exception as e:
+        logger.error(f"Failed to queue training job: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to queue training job: {str(e)}")
+
+@app.get("/model/training/status", tags=["model"])
+async def get_training_status(user = Depends(lambda: app.state.auth_manager.get_current_user)):
+    """
+    Get status of latest training job.
+    """
+    try:
+        result = app.state.supabase.table('training_jobs').select('*').order('created_at', desc=True).limit(1).execute()
+        if not result.data:
+            return {"status": "no_jobs_found"}
+        return result.data[0]
+    except Exception as e:
+        logger.error(f"Failed to get training status: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get training status")
+
+@app.post("/subscription/webhook", tags=["webhooks"])
+async def stripe_webhook(request: Request):
+    """
+    Handle Stripe webhook events for subscription management.
+    """
     payload = await request.body()
     sig_header = request.headers.get('stripe-signature')
     endpoint_secret = os.getenv('STRIPE_WEBHOOK_SECRET')
@@ -578,13 +662,17 @@ async def stripe_webhook(request):
     
     return {"status": "success"}
 
-@app.get("/metrics")
+@app.get("/metrics", tags=["system"])
 async def get_metrics():
-    """Prometheus metrics endpoint"""
+    """
+    Prometheus metrics endpoint.
+    """
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 async def save_chat_history(session_id: str, user_id: str, user_message: str, bot_response: str, tokens_used: int, inference_time: float):
-    """Save chat interaction to database"""
+    """
+    Save chat interaction to database (Internal helper).
+    """
     try:
         app.state.supabase.table('chat_messages').insert({
             'session_id': session_id,

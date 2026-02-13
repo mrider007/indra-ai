@@ -21,4 +21,3 @@ COPY . .
 RUN mkdir -p /app/models /app/logs /app/data
 
 # Run the trainer
-CMD ["python", "train.py"]

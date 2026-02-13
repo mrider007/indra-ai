@@ -1,13 +1,14 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import axios from "axios"
 import io from "socket.io-client"
-import ReactMarkdown from "react-markdown"
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter"
-import { dark } from "react-syntax-highlighter/dist/esm/styles/prism"
-import { format } from "date-fns"
 import "./App.css"
+
+import Header from "./components/Header"
+import ChatInterface from "./components/ChatInterface"
+import InputArea from "./components/InputArea"
+import TrainingModal from "./components/TrainingModal"
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000"
 const WS_URL = process.env.REACT_APP_WS_URL || "ws://localhost:8000"
@@ -19,27 +20,27 @@ function App() {
   const [isConnected, setIsConnected] = useState(false)
   const [sessionId, setSessionId] = useState("")
   const [modelInfo, setModelInfo] = useState(null)
+
   const [settings, setSettings] = useState({
     maxLength: 150,
     temperature: 0.7,
     useWebSocket: true,
   })
 
-  const messagesEndRef = useRef(null)
+  // Modal State
+  const [showTrainingModal, setShowTrainingModal] = useState(false)
+  const [trainingStatus, setTrainingStatus] = useState(null)
+
   const socketRef = useRef(null)
 
+  // Initialization
   useEffect(() => {
-    // Generate session ID
     const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     setSessionId(newSessionId)
 
-    // Load model info
     loadModelInfo()
-
-    // Load chat history
     loadChatHistory(newSessionId)
 
-    // Setup WebSocket connection
     if (settings.useWebSocket) {
       setupWebSocket(newSessionId)
     }
@@ -49,15 +50,16 @@ function App() {
         socketRef.current.disconnect()
       }
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Re-connect WS if settings change
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+    if (settings.useWebSocket && !isConnected && sessionId) {
+      setupWebSocket(sessionId)
+    } else if (!settings.useWebSocket && isConnected) {
+      socketRef.current?.disconnect()
+    }
+  }, [settings.useWebSocket, sessionId])
 
   const loadModelInfo = async () => {
     try {
@@ -68,9 +70,9 @@ function App() {
     }
   }
 
-  const loadChatHistory = async (sessionId) => {
+  const loadChatHistory = async (sid) => {
     try {
-      const response = await axios.get(`${API_URL}/chat/history/${sessionId}`)
+      const response = await axios.get(`${API_URL}/chat/history/${sid}`)
       const history = response.data.flatMap((item) => [
         {
           type: "user",
@@ -81,17 +83,17 @@ function App() {
           type: "bot",
           content: item.bot_response,
           timestamp: new Date(item.timestamp),
+          inferenceTime: item.inference_time,
         },
       ])
-
       setMessages(history)
     } catch (error) {
       console.error("Failed to load chat history:", error)
     }
   }
 
-  const setupWebSocket = (sessionId) => {
-    const socket = io(`${WS_URL}/ws/${sessionId}`, {
+  const setupWebSocket = (sid) => {
+    const socket = io(`${WS_URL}/ws/${sid}`, {
       transports: ["websocket"],
     })
 
@@ -135,7 +137,6 @@ function App() {
     setIsLoading(true)
 
     if (settings.useWebSocket && socketRef.current && isConnected) {
-      // Send via WebSocket
       socketRef.current.emit(
         "message",
         JSON.stringify({
@@ -145,7 +146,6 @@ function App() {
         }),
       )
     } else {
-      // Send via HTTP API
       try {
         const response = await axios.post(`${API_URL}/chat`, {
           message: inputMessage,
@@ -180,156 +180,73 @@ function App() {
     setInputMessage("")
   }
 
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
-  }
-
   const clearChat = () => {
     setMessages([])
   }
 
-  const CodeBlock = ({ language, value }) => {
-    return (
-      <SyntaxHighlighter
-        language={language}
-        style={dark}
-        customStyle={{
-          margin: "1rem 0",
-          borderRadius: "8px",
-        }}
-      >
-        {value}
-      </SyntaxHighlighter>
-    )
+  // --- Training Modal Logic ---
+
+  const loadTrainingStatus = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_URL}/model/training/status`)
+      setTrainingStatus(response.data)
+    } catch (error) {
+      console.error("Failed to load training status:", error)
+    }
+  }, [])
+
+  const startTraining = async () => {
+    try {
+      await axios.post(`${API_URL}/model/train`)
+      loadTrainingStatus()
+
+      const interval = setInterval(async () => {
+        const response = await axios.get(`${API_URL}/model/training/status`)
+        setTrainingStatus(response.data)
+        if (response.data.status === 'completed' || response.data.status === 'failed') {
+          clearInterval(interval)
+          loadModelInfo()
+        }
+      }, 5000)
+    } catch (error) {
+      console.error("Failed to start training:", error)
+      alert("Failed to start training. " + (error.response?.data?.detail || error.message))
+    }
   }
 
   return (
     <div className="app">
-      <header className="app-header">
-        <div className="header-content">
-          <h1>🧠 Indra LLM</h1>
-          <div className="status-indicators">
-            <div className={`status-indicator ${isConnected ? "connected" : "disconnected"}`}>
-              {isConnected ? "🟢 Connected" : "🔴 Disconnected"}
-            </div>
-            {modelInfo && (
-              <div className="model-info">
-                📊 {modelInfo.model_name} ({(modelInfo.parameters / 1000000).toFixed(1)}M params)
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
+      <Header
+        isConnected={isConnected}
+        modelInfo={modelInfo}
+        onOpenTraining={() => setShowTrainingModal(true)}
+      />
 
       <main className="chat-container">
-        <div className="messages-container">
-          {messages.map((message, index) => (
-            <div key={index} className={`message ${message.type}`}>
-              <div className="message-content">
-                {message.type === "user" ? (
-                  <div className="user-message">{message.content}</div>
-                ) : message.type === "error" ? (
-                  <div className="error-message">{message.content}</div>
-                ) : (
-                  <div className="bot-message">
-                    <ReactMarkdown
-                      components={{
-                        code({ node, inline, className, children, ...props }) {
-                          const match = /language-(\w+)/.exec(className || "")
-                          return !inline && match ? (
-                            <CodeBlock language={match[1]} value={String(children).replace(/\n$/, "")} {...props} />
-                          ) : (
-                            <code className={className} {...props}>
-                              {children}
-                            </code>
-                          )
-                        },
-                      }}
-                    >
-                      {message.content}
-                    </ReactMarkdown>
-                  </div>
-                )}
-              </div>
-              <div className="message-meta">
-                <span className="timestamp">{format(message.timestamp, "HH:mm:ss")}</span>
-                {message.inferenceTime && (
-                  <span className="inference-time">⚡ {message.inferenceTime.toFixed(2)}s</span>
-                )}
-              </div>
-            </div>
-          ))}
-          {isLoading && (
-            <div className="message bot">
-              <div className="message-content">
-                <div className="typing-indicator">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+        <ChatInterface
+          messages={messages}
+          isLoading={isLoading}
+        />
 
-        <div className="input-container">
-          <div className="settings-bar">
-            <label>
-              Max Length:
-              <input
-                type="range"
-                min="50"
-                max="500"
-                value={settings.maxLength}
-                onChange={(e) => setSettings((prev) => ({ ...prev, maxLength: Number.parseInt(e.target.value) }))}
-              />
-              <span>{settings.maxLength}</span>
-            </label>
-            <label>
-              Temperature:
-              <input
-                type="range"
-                min="0.1"
-                max="2.0"
-                step="0.1"
-                value={settings.temperature}
-                onChange={(e) => setSettings((prev) => ({ ...prev, temperature: Number.parseFloat(e.target.value) }))}
-              />
-              <span>{settings.temperature}</span>
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={settings.useWebSocket}
-                onChange={(e) => setSettings((prev) => ({ ...prev, useWebSocket: e.target.checked }))}
-              />
-              WebSocket
-            </label>
-            <button onClick={clearChat} className="clear-button">
-              🗑️ Clear
-            </button>
-          </div>
-
-          <div className="message-input-container">
-            <textarea
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Type your message here... (Press Enter to send, Shift+Enter for new line)"
-              className="message-input"
-              rows="3"
-              disabled={isLoading}
-            />
-            <button onClick={sendMessage} disabled={isLoading || !inputMessage.trim()} className="send-button">
-              {isLoading ? "⏳" : "🚀"}
-            </button>
-          </div>
-        </div>
+        <InputArea
+          inputMessage={inputMessage}
+          setInputMessage={setInputMessage}
+          sendMessage={sendMessage}
+          isLoading={isLoading}
+          settings={settings}
+          setSettings={setSettings}
+          clearChat={clearChat}
+        />
       </main>
+
+      <TrainingModal
+        show={showTrainingModal}
+        onClose={() => setShowTrainingModal(false)}
+        modelInfo={modelInfo}
+        trainingStatus={trainingStatus}
+        loadTrainingStatus={loadTrainingStatus}
+        startTraining={startTraining}
+      />
     </div>
   )
 }
