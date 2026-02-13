@@ -1,5 +1,6 @@
 # Vercel serverless function for IndraAI API
 import os
+# Vercel Deployment: Active
 import json
 from datetime import datetime
 from fastapi import FastAPI, HTTPException

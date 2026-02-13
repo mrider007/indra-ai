@@ -359,6 +359,9 @@ docker-compose logs -f data-collection
 
 Indra AI is an advanced, self-hosting capable AI platform featuring a specialized LLM for Indian languages and culture. It includes a modern React frontend, a Python-based model serving API, and automated training pipelines.
 
+> **Status**: Ready for Vercel Deployment 🚀
+
+
 ## 🚀 Features
 
 -   **Specialized LLM**: Fine-tuned on Indian cultural data (history, mythology, festivals).

@@ -20,7 +20,7 @@ from prometheus_client import Counter, Histogram, Gauge, start_http_server
 import wandb
 import yaml
 
-# Metrics
+# Metrics.
 TRAINING_JOBS = Counter('training_jobs_total', 'Total training jobs', ['status'])
 TRAINING_DURATION = Histogram('training_duration_seconds', 'Training duration')
 TRAINING_LOSS = Gauge('training_loss', 'Current training loss')
