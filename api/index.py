@@ -9,7 +9,13 @@ from supabase import create_client, Client
 import redis
 
 # Initialize FastAPI
-app = FastAPI(title="IndraAI Serverless API", version="1.0.0")
+app = FastAPI(
+    title="IndraAI Serverless API",
+    version="1.0.0",
+    root_path="/api",
+    docs_url="/docs",
+    openapi_url="/openapi.json"
+)
 
 # Add CORS
 app.add_middleware(

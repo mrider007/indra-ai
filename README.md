@@ -410,27 +410,27 @@ Access the services at:
 -   **API**: `http://localhost:8000`
 -   **API Docs**: `http://localhost:8000/docs`
 
-### 2. Frontend Development (Vercel / Local)
+### 2. Vercel Deployment (Full Stack)
 
-The frontend is a standard React application located at the root.
+You can deploy the entire application (Frontend + Lite Backend) to Vercel.
 
-**Install Dependencies:**
-```bash
-npm install
-```
+1.  Push your changes to GitHub.
+2.  Import the repository into Vercel.
+3.  Vercel will detect the React app at the root.
+4.  **Important**: The `api/` folder contains a Serverless Function that will serve as a "Lite" version of the backend (for basic chat responses without the heavy ML model).
+    -   The real ML model requires Docker (Step 1).
+    -   The Vercel backend checks Supabase and Redis but uses a simple response generator to stay within serverless limits.
 
-**Run Locally:**
-```bash
-npm start
-``` 
-(Ensure the backend API is running on port 8000 or update `.env`).
+**Environment Variables (Vercel):**
+Add these to your Vercel project settings:
+-   `REACT_APP_API_URL`: `/api` (or empty, since requests are proxied)
+-   `SUPABASE_URL`: ...
+-   `SUPABASE_SERVICE_ROLE_KEY`: ...
+-   `REDIS_URL`: ...
 
-**Deploy to Vercel:**
-Simply connect this repository to Vercel. It will automatically detect the React app at the root and deploy it.
+### 3. Backend Development (Docker / Local)
 
-### 3. Backend Development
-
-The backend code is in `model-serving/`.
+The full backend code is in `model-serving/`.
 
 ```bash
 cd model-serving
