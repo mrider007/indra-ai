@@ -3,7 +3,8 @@ import os
 # Vercel Deployment: Active
 import json
 from datetime import datetime
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from supabase import create_client, Client
@@ -103,8 +104,11 @@ async def chat_free(request: ChatRequest):
     )
 
 @app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    return {"error": str(exc), "status": 500}
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"error": str(exc), "status": 500}
+    )
 
 @app.get("/stats")
 async def get_stats():
