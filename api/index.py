@@ -6,10 +6,25 @@ import json
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
+
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from supabase import create_client, Client
-import redis
+
+# Safe Imports
+try:
+    from supabase import create_client, Client
+    supabase_available = True
+except ImportError:
+    supabase_available = False
+    Client = object # Dummy for type hinting
+    print("Warning: supabase library not available.")
+
+try:
+    import redis
+    redis_available = True
+except ImportError:
+    redis_available = False
+    print("Warning: redis library not available.")
 
 # Initialize FastAPI
 app = FastAPI(
@@ -35,15 +50,13 @@ supabase_key = os.getenv('SUPABASE_SERVICE_ROLE_KEY')
 database_url = os.getenv('DATABASE_URL')
 supabase: Client = None
 
-if supabase_url and supabase_key and supabase_key != "placeholder_need_service_key":
+if supabase_available and supabase_url and supabase_key and supabase_key != "placeholder_need_service_key":
     try:
         supabase = create_client(supabase_url, supabase_key)
     except Exception as e:
         print(f"Warning: Failed to initialize Supabase: {e}")
 else:
-    print("Warning: Supabase keys not set or invalid. Running in compatibility mode.")
-
-    print("Warning: Supabase keys not set or invalid. Running in compatibility mode.")
+    print("Warning: Supabase keys not set, invalid, or library missing. Running in compatibility mode.")
 
 # Postgres Direct Connection (Fallback)
 try:
@@ -89,6 +102,8 @@ async def debug_info():
     """Debug endpoint to check environment status"""
     return {
         "psycopg2_installed": psycopg2_available,
+        "supabase_installed": supabase_available,
+        "redis_installed": redis_available,
         "supabase_client_initialized": supabase is not None,
         "env_vars_set": {
             "SUPABASE_URL": bool(supabase_url),
