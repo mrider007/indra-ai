@@ -1,5 +1,6 @@
 # Vercel serverless function for IndraAI API
 import os
+import sys
 # Vercel Deployment: Active
 import json
 from datetime import datetime
@@ -42,11 +43,20 @@ if supabase_url and supabase_key and supabase_key != "placeholder_need_service_k
 else:
     print("Warning: Supabase keys not set or invalid. Running in compatibility mode.")
 
+    print("Warning: Supabase keys not set or invalid. Running in compatibility mode.")
+
 # Postgres Direct Connection (Fallback)
-import psycopg2
-from psycopg2.extras import RealDictCursor
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    psycopg2_available = True
+except ImportError:
+    psycopg2_available = False
+    print("Warning: psycopg2 not available. Database logging disabled.")
 
 def get_db_connection():
+    if not psycopg2_available:
+        return None
     if not database_url:
         return None
     try:
@@ -72,6 +82,20 @@ async def root():
         "message": "IndraAI Serverless API",
         "version": "1.0.0",
         "status": "healthy"
+    }
+
+@app.get("/debug")
+async def debug_info():
+    """Debug endpoint to check environment status"""
+    return {
+        "psycopg2_installed": psycopg2_available,
+        "supabase_client_initialized": supabase is not None,
+        "env_vars_set": {
+            "SUPABASE_URL": bool(supabase_url),
+            "DATABASE_URL": bool(database_url),
+            # Do not expose actual values
+        },
+        "python_version": sys.version
     }
 
 @app.get("/health")
