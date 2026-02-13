@@ -355,208 +355,108 @@ docker-compose logs -f api
 docker-compose logs -f data-collection
 \`\`\`
 
-### Database Management
-\`\`\`bash
-# Apply migrations
-supabase db push
+# 🧠 Indra AI Platform
 
-# Reset database
-supabase db reset
+Indra AI is an advanced, self-hosting capable AI platform featuring a specialized LLM for Indian languages and culture. It includes a modern React frontend, a Python-based model serving API, and automated training pipelines.
 
-# Backup database
-supabase db dump > backup.sql
+## 🚀 Features
 
-# View database
-supabase db studio
-\`\`\`
+-   **Specialized LLM**: Fine-tuned on Indian cultural data (history, mythology, festivals).
+-   **Modern Frontend**: React-based chat interface with real-time WebSocket support.
+-   **Model Management**:
+    -   **Auto-Training**: Self-improving model based on usage patterns.
+    -   **Training Control**: Pro users can trigger training jobs directly from the UI.
+    -   **Live Updates**: Zero-downtime model updates via API.
+-   **Pro Tier**: Subscription-based access to faster inference, training controls, and higher quotas (via Stripe).
+-   **Comprehensive API**: FastAPI backend with Swagger documentation (`/docs`).
 
-### Model Management
-\`\`\`bash
-# Trigger manual training
-curl -X POST http://localhost:8000/model/train
+## 🛠️ Architecture
 
-# Update model
-curl -X POST http://localhost:8000/model/update \
-  -H "Content-Type: application/json" \
-  -d '{"model_path": "/app/models/new-model"}'
+The project is structured as follows:
 
-# Check model info
-curl http://localhost:8000/model/info
-\`\`\`
-
-## 💰 Monetization
-
-### Subscription Tiers
-
-#### Free Tier
-- 100 requests/hour
-- 50,000 tokens/day
-- Basic model responses
-- Community support
-
-#### Pro Tier ($19/month)
-- 10,000 requests/hour
-- 1,000,000 tokens/day
-- Advanced model features
-- WebSocket access
-- Priority support
-- Custom model training
-
-### Stripe Integration
-\`\`\`bash
-# Set up Stripe webhook
-STRIPE_WEBHOOK_SECRET=your-webhook-secret
-
-# Handle subscription events
-POST /subscription/webhook
-\`\`\`
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-#### Service Won't Start
-\`\`\`bash
-# Check logs
-docker-compose logs service-name
-
-# Check ports
-netstat -tulpn | grep :8000
-
-# Restart service
-docker-compose restart service-name
-\`\`\`
-
-#### Database Connection Issues
-\`\`\`bash
-# Check Supabase connection
-curl -H "apikey: YOUR_ANON_KEY" \
-  "https://your-project.supabase.co/rest/v1/user_profiles"
-
-# Reset database connection
-docker-compose restart api
-\`\`\`
-
-#### Model Loading Issues
-\`\`\`bash
-# Check model directory
-ls -la models/
-
-# Check GPU availability
-nvidia-smi
-
-# Use CPU-only mode
-export CUDA_VISIBLE_DEVICES=""
-\`\`\`
-
-#### Memory Issues
-\`\`\`bash
-# Check memory usage
-docker stats
-
-# Reduce batch size
-export BATCH_SIZE=1
-
-# Limit workers
-export API_WORKERS=1
-\`\`\`
-
-### Debug Mode
-\`\`\`bash
-# Enable debug logging
-export DEBUG=true
-export LOG_LEVEL=DEBUG
-
-# View detailed logs
-docker-compose logs -f api
-\`\`\`
-
-## 📚 Development
-
-### Project Structure
-\`\`\`
+```
 indra-ai/
-├── data-collection/      # Web scraping service
-├── data-processing/      # Data cleaning and NLP
-├── model-training/       # Training pipeline
-├── model-serving/        # FastAPI application
-├── orchestration/        # Job scheduling
-├── monitoring/          # Prometheus & Grafana
-├── supabase/           # Database migrations
-├── scripts/            # Setup and management
-├── api/                # Vercel serverless
-└── README.md
-\`\`\`
+├── src/                # React Frontend source code
+├── public/             # Frontend static assets
+├── model-serving/      # FastAPI Backend & Model Serving
+├── model-training/     # Training pipeline & workers
+├── data-collection/    # Scrapers & data ingestion
+├── orchestration/      # Job scheduling & management
+└── docker-compose.yml  # Container orchestration
+```
 
-### Adding New Features
+## ⚡ Quick Start
 
-1. **New Scraping Source**:
-   - Add to `data-collection/config/sources.yaml`
-   - Test with limited pages first
-   - Monitor quality scores
+### Prerequisites
+- Docker & Docker Compose
+- Node.js 18+ (for local frontend dev)
+- NVIDIA GPU (Recommended for training)
 
-2. **New API Endpoint**:
-   - Add to `model-serving/app.py`
-   - Update OpenAPI documentation
-   - Add authentication if needed
-   - Update rate limiting
+### 1. Deployment (Docker)
 
-3. **New Model**:
-   - Update `model-training/config/training.yaml`
-   - Test with small dataset first
-   - Monitor training metrics
+The easiest way to run the full platform is using our deployment script:
 
-### Code Quality
-\`\`\`bash
-# Format code
-black .
-isort .
+```bash
+./deploy.sh prod
+```
 
-# Lint code
-flake8 .
-mypy .
+This will:
+1.  Check system requirements.
+2.  Build all Docker containers (API, Training, Redis, Supabase connection).
+3.  Start the services.
 
-# Run tests
-pytest tests/
-\`\`\`
+Access the services at:
+-   **Frontend**: `http://localhost:3000` (if running locally) or your Vercel URL.
+-   **API**: `http://localhost:8000`
+-   **API Docs**: `http://localhost:8000/docs`
 
-## 🤝 Contributing
+### 2. Frontend Development (Vercel / Local)
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature-name`
-3. Make your changes
-4. Add tests for new functionality
-5. Run the test suite: `./scripts/test-dev.sh`
-6. Submit a pull request
+The frontend is a standard React application located at the root.
 
-### Development Workflow
-\`\`\`bash
-# Setup development environment
-./scripts/dev-setup.sh
+**Install Dependencies:**
+```bash
+npm install
+```
 
-# Make changes
-# ...
+**Run Locally:**
+```bash
+npm start
+``` 
+(Ensure the backend API is running on port 8000 or update `.env`).
 
-# Test changes
-./scripts/test-dev.sh
+**Deploy to Vercel:**
+Simply connect this repository to Vercel. It will automatically detect the React app at the root and deploy it.
 
-# Format and lint
-black .
-flake8 .
+### 3. Backend Development
 
-# Commit and push
-git add .
-git commit -m "feat: add new feature"
-git push origin feature-name
-\`\`\`
+The backend code is in `model-serving/`.
+
+```bash
+cd model-serving
+pip install -r requirements.txt
+python app.py
+```
+
+## 📚 API Documentation
+
+Complete API documentation is available at `/docs` when the API is running.
+Key endpoints:
+-   `POST /chat`: Chat with the model.
+-   `POST /model/train`: Trigger a training job (Pro).
+-   `GET /model/info`: Get current model status.
+
+## 🤝 Contribution
+
+1.  Fork the repo.
+2.  Create a feature branch.
+3.  Commit your changes.
+4.  Push to the branch.
+5.  Create a Pull Request.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- **Hugging Face** - Transformers library and model hub
+MIT
 - **FastAPI** - High-performance web framework
 - **Supabase** - Backend-as-a-Service platform
 - **Redis** - In-memory data structure store

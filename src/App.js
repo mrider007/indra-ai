@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import axios from "axios"
 import io from "socket.io-client"
-import "./App.css"
 
 import Header from "./components/Header"
 import ChatInterface from "./components/ChatInterface"
