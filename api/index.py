@@ -31,15 +31,29 @@ app.add_middleware(
 # Initialize Supabase (Safe Mode)
 supabase_url = os.getenv('SUPABASE_URL')
 supabase_key = os.getenv('SUPABASE_SERVICE_ROLE_KEY')
+database_url = os.getenv('DATABASE_URL')
 supabase: Client = None
 
-if supabase_url and supabase_key:
+if supabase_url and supabase_key and supabase_key != "placeholder_need_service_key":
     try:
         supabase = create_client(supabase_url, supabase_key)
     except Exception as e:
         print(f"Warning: Failed to initialize Supabase: {e}")
 else:
-    print("Warning: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set. Running in offline mode.")
+    print("Warning: Supabase keys not set or invalid. Running in compatibility mode.")
+
+# Postgres Direct Connection (Fallback)
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+def get_db_connection():
+    if not database_url:
+        return None
+    try:
+        return psycopg2.connect(database_url)
+    except Exception as e:
+        print(f"Failed to connect to DB: {e}")
+        return None
 
 # Pydantic models
 class ChatRequest(BaseModel):
@@ -86,6 +100,7 @@ async def chat_free(request: ChatRequest):
     response_text = f"Hello! You said: '{request.message}'. This is a demo response from IndraAI serverless API."
     
     # Log usage to Supabase
+    # Log usage to Supabase or Direct DB
     if supabase:
         try:
             supabase.table('api_usage').insert({
@@ -95,7 +110,21 @@ async def chat_free(request: ChatRequest):
                 'created_at': datetime.utcnow().isoformat()
             }).execute()
         except Exception as e:
-            print(f"Failed to log usage: {e}")
+            print(f"Failed to log usage (Supabase): {e}")
+    elif database_url:
+        # Fallback to direct DB
+        try:
+            conn = get_db_connection()
+            if conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "INSERT INTO api_usage (endpoint, tokens_used, created_at) VALUES (%s, %s, %s)",
+                        ('/chat/free', len(response_text.split()), datetime.utcnow())
+                    )
+                conn.commit()
+                conn.close()
+        except Exception as e:
+            print(f"Failed to log usage (Direct DB): {e}")
     
     return ChatResponse(
         response=response_text,
