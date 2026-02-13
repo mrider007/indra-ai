@@ -27,7 +27,7 @@ function App() {
     useWebSocket: true,
   })
 
-  // Modal State
+
   const [showTrainingModal, setShowTrainingModal] = useState(false)
   const [trainingStatus, setTrainingStatus] = useState(null)
 

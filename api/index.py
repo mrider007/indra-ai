@@ -27,10 +27,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize Supabase
+# Initialize Supabase (Safe Mode)
 supabase_url = os.getenv('SUPABASE_URL')
 supabase_key = os.getenv('SUPABASE_SERVICE_ROLE_KEY')
-supabase: Client = create_client(supabase_url, supabase_key)
+supabase: Client = None
+
+if supabase_url and supabase_key:
+    try:
+        supabase = create_client(supabase_url, supabase_key)
+    except Exception as e:
+        print(f"Warning: Failed to initialize Supabase: {e}")
+else:
+    print("Warning: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set. Running in offline mode.")
 
 # Pydantic models
 class ChatRequest(BaseModel):
@@ -79,21 +87,26 @@ async def chat_free(request: ChatRequest):
     response_text = f"Hello! You said: '{request.message}'. This is a demo response from IndraAI serverless API."
     
     # Log usage to Supabase
-    try:
-        supabase.table('api_usage').insert({
-            'user_id': None,  # Anonymous for free tier
-            'endpoint': '/chat/free',
-            'tokens_used': len(response_text.split()),
-            'created_at': datetime.utcnow().isoformat()
-        }).execute()
-    except Exception as e:
-        print(f"Failed to log usage: {e}")
+    if supabase:
+        try:
+            supabase.table('api_usage').insert({
+                'user_id': None,  # Anonymous for free tier
+                'endpoint': '/chat/free',
+                'tokens_used': len(response_text.split()),
+                'created_at': datetime.utcnow().isoformat()
+            }).execute()
+        except Exception as e:
+            print(f"Failed to log usage: {e}")
     
     return ChatResponse(
         response=response_text,
         timestamp=datetime.utcnow(),
         tokens_used=len(response_text.split())
     )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    return {"error": str(exc), "status": 500}
 
 @app.get("/stats")
 async def get_stats():
